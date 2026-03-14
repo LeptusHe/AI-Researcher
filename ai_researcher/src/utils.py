@@ -1,6 +1,38 @@
 import os
 import json
-import random 
+import random
+
+
+def create_client(engine, keys_path="../keys.json"):
+    """Unified client creation. Returns (client, client_type).
+
+    client_type: "anthropic" | "openai" | "openai_compatible" | "together"
+    """
+    with open(keys_path, "r") as f:
+        keys = json.load(f)
+
+    # Anthropic Claude
+    if "claude" in engine:
+        import anthropic
+        return anthropic.Anthropic(api_key=keys["anthropic_key"]), "anthropic"
+
+    # Check for OpenAI-compatible third-party base_url
+    base_url = keys.get("openai_base_url", "").strip()
+
+    if base_url:
+        from openai import OpenAI
+        api_key = keys.get("openai_compatible_key", "").strip() or keys.get("api_key", "")
+        return OpenAI(api_key=api_key, base_url=base_url), "openai_compatible"
+
+    # Official OpenAI
+    if "o1" in engine or "gpt" in engine:
+        from openai import OpenAI
+        return OpenAI(organization=keys.get("organization_id", ""), api_key=keys["api_key"]), "openai"
+
+    # Together API fallback
+    from together import Together
+    return Together(), "together"
+
 
 def calc_price(model, usage):
     if "claude-3-5-sonnet" in model:
@@ -22,9 +54,9 @@ def calc_price(model, usage):
 
     return None
 
-def call_api(client, model, prompt_messages, temperature=1.0, top_p=1.0, max_tokens=1000, seed=2024, json_output=False):
+def call_api(client, model, prompt_messages, temperature=1.0, top_p=1.0, max_tokens=1000, seed=2024, json_output=False, client_type=None):
     ## Anthropic models
-    if "claude" in model:
+    if client_type == "anthropic" or (client_type is None and "claude" in model):
         if json_output:
             prompt = prompt_messages[0]["content"] + " Directly output the JSON dict with no additional text (avoid the presence of newline characters (\"\n\") and unescaped double quotes within the string so that we can call json.loads() on the output directly). Make sure you follow the exact same JSON format as shown in the examples. Don't include \"```json\" or \"```\" at the beginning and end of the output."
             prompt_messages = [{"role": "user", "content": prompt}]
@@ -37,8 +69,9 @@ def call_api(client, model, prompt_messages, temperature=1.0, top_p=1.0, max_tok
         )
         cost = calc_price(model, message.usage)
         response = message.content[0].text
-    ## Together models
-    elif "llama" in model.lower() or "qwen" in model.lower() or "qwq" in model.lower():
+    ## Together models / OpenAI-compatible third-party providers
+    elif client_type in ("openai_compatible", "together") or \
+         (client_type is None and ("llama" in model.lower() or "qwen" in model.lower() or "qwq" in model.lower())):
         if json_output:
             prompt = prompt_messages[0]["content"] + " Directly output the JSON dict with no additional text (avoid the presence of newline characters (\"\n\") and unescaped double quotes within the string so that we can call json.loads() on the output directly). Make sure you follow the exact same JSON format as shown in the examples. Don't include \"```json\" or \"```\" at the beginning and end of the output. Remember to always close the dict with a closing curly brace (\"}\")."
             prompt_messages = [{"role": "user", "content": prompt}]

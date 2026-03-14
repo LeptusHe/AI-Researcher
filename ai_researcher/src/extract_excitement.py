@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api, shuffle_dict_and_convert_to_string
+from utils import call_api, create_client, shuffle_dict_and_convert_to_string
 import argparse
 import json
 import os
@@ -11,7 +9,7 @@ import retry
 from tqdm import tqdm 
 
 @retry.retry(tries=3, delay=2)
-def extract_excitement(reviews, openai_client, model, seed):
+def extract_excitement(reviews, openai_client, model, seed, client_type=None):
     prompt = "I have received reviews on a paper and I want you to help me decide whether the reviewers think the paper is exciting and impactful.\n" 
     prompt += "The full reviews are:\n"
     prompt += reviews + "\n"
@@ -21,7 +19,7 @@ def extract_excitement(reviews, openai_client, model, seed):
     prompt += "Return a single answer (yes / no / neutral) on whether the paper is exciting with no other explanation.\n"
 
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=2, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=2, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 if __name__ == "__main__":
@@ -31,23 +29,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
+    client, client_type = create_client(args.engine)
     random.seed(args.seed)
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
 
     with open("prompts/paper_summary_demos.txt", "r") as f:
         demos = f.read()
@@ -72,7 +55,7 @@ if __name__ == "__main__":
 
         try:
             reviews = concat_reviews(paper)
-            prompt, response, cost = extract_excitement(reviews, client, args.engine, args.seed)
+            prompt, response, cost = extract_excitement(reviews, client, args.engine, args.seed, client_type=client_type)
             # print (prompt)
             # print ("\n\n")
             # print (response)

@@ -1,5 +1,4 @@
-from openai import OpenAI
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -12,15 +11,15 @@ random.seed(2024)
 
 
 @retry.retry(tries=3, delay=2)
-def generate_test_cases(experiment_plan, test_case_demos, openai_client, model, seed):
+def generate_test_cases(experiment_plan, test_case_demos, openai_client, model, seed, client_type=None):
     ## use gpt4 to generate test cases
-    prompt = "You are a researcher specialized in Natural Language Processing. I will give you a research project proposal to work on, and your task is to come up with a few concrete test cases based on the project description.\n"
+    prompt = "You are a researcher specialized in Mobile Graphics and Real-time Rendering. I will give you a research project proposal to work on, and your task is to come up with a few concrete test cases based on the project description.\n"
     prompt += "The project proposal is:\n" + experiment_plan.strip() + "\n"
     prompt += "You should genearte 3 - 5 test examples for this project. I will give two examples to illustrate what the test examples should look like:\n" + test_case_demos + "\n"
     prompt += "Now directly genearte the test cases following the above format."
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 
@@ -34,16 +33,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("keys.json", "r") as f:
-        keys = json.load(f)
-
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    S2_KEY = keys["s2_key"]
-    openai_client = OpenAI(
-        organization=ORG_ID,
-        api_key=OAI_KEY
-    )
+    openai_client, client_type = create_client(args.engine, keys_path="keys.json")
 
     with open("test_cases.txt", "r") as f:
         test_case_demos = f.read().strip()
@@ -70,7 +60,7 @@ if __name__ == "__main__":
             continue 
         
         ## generate test cases
-        prompt, response, cost = generate_test_cases(idea, test_case_demos, openai_client, args.engine, args.seed)
+        prompt, response, cost = generate_test_cases(idea, test_case_demos, openai_client, args.engine, args.seed, client_type=client_type)
         print (prompt + "\n")
         print (response + "\n")
         print (cost)

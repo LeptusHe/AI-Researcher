@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api, format_plan_json
+from utils import call_api, create_client, format_plan_json
 import argparse
 import json
 import os
@@ -9,7 +7,7 @@ import random
 import retry
 
 @retry.retry(tries=3, delay=2)
-def style_transfer(model_idea, human_idea, openai_client, model, seed):
+def style_transfer(model_idea, human_idea, openai_client, model, seed, client_type=None):
     prompt = "You are a writing assistant specialized in editing academic writing.\n"
     prompt += "I will give you a student's research idea and an idea template. Your task is to edit the student's idea to follow the template's format.\n"
     prompt += "Student idea:\n" + human_idea + "\n\n"
@@ -27,7 +25,7 @@ def style_transfer(model_idea, human_idea, openai_client, model, seed):
     prompt += "Now directly generate the edited student idea to match the format of the template:\n"
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4096, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4096, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 
@@ -41,23 +39,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
+    client, client_type = create_client(args.engine)
     random.seed(args.seed)
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
     
     with open("prompts/machine_idea.txt", "r") as f:
         machine_idea = f.read() 
@@ -81,7 +64,7 @@ if __name__ == "__main__":
         elif args.format == "json":
             with open(os.path.join(args.cache_dir, filename), "r") as f:
                 human_idea = format_plan_json(json.load(f)["full_experiment_plan"], indent_level=0, skip_test_cases=False, skip_fallback=False)
-        prompt, response, cost = style_transfer(machine_idea, human_idea, client, args.engine, args.seed)
+        prompt, response, cost = style_transfer(machine_idea, human_idea, client, args.engine, args.seed, client_type=client_type)
         all_costs += cost
         
         ## cache processed file 

@@ -1,7 +1,7 @@
 ## example usage
 experiment_plan_cache_dir="../cache_results_test/project_proposals/"
 ranking_score_dir="../cache_results_test/ranking/"
-cache_names=("factuality_prompting_method")
+cache_names=("mobile_rendering_optimization")
 seed=2024
 
 for cache_name in "${cache_names[@]}"; do
@@ -11,5 +11,5 @@ for cache_name in "${cache_names[@]}"; do
     --experiment_plan_cache_dir "$experiment_plan_cache_dir" \
     --cache_name "$cache_name" \
     --ranking_score_dir "$ranking_score_dir" \
-    --max_round 5 
+    --max_round 5
 done

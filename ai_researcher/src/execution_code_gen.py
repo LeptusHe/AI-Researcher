@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -11,8 +9,8 @@ import random
 random.seed(2024)
 
 @retry.retry(tries=3, delay=2)
-def execution_generation_method(experiment_plan, demo_experiment_plan, demo_execution_code, openai_client, model, seed):
-    prompt = "You are an expert researcher in Natural Language Processing and your job is to write Python code to implement the given research idea.\n"
+def execution_generation_method(experiment_plan, demo_experiment_plan, demo_execution_code, openai_client, model, seed, client_type=None):
+    prompt = "You are an expert researcher in Mobile Graphics and Real-time Rendering and your job is to write Python code to implement the given research idea.\n"
     prompt += "Below is an example of an experiment plan and its corresponding implementation, which should serve as a template for your code implementation.\n"
     prompt += "Example experiment plan:\n" + str(demo_experiment_plan) + "\n"
     prompt += "Example implementation code:\n" + demo_execution_code + "\n\n"
@@ -26,7 +24,7 @@ def execution_generation_method(experiment_plan, demo_experiment_plan, demo_exec
     
     # print (prompt)
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4096, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4096, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 if __name__ == "__main__":
@@ -37,32 +35,15 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
-    
+    client, client_type = create_client(args.engine)
+    cache_dir = "../cache_results_claude_may/" if "claude" in args.engine else "../cache_results_gpt4/"
+
     with open("prompts/execution_demo.py", "r") as f:
         demo_execution_code = f.read().strip()
-    
+
     with open("prompts/experiment_plan_demo.json", "r") as f:
         demo_experiment_plan = json.load(f)
         demo_experiment_plan = demo_experiment_plan["full_experiment_plan"]
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    S2_KEY = keys["s2_key"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-        cache_dir = "../cache_results_claude_may/"
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
-        cache_dir = "../cache_results_gpt4/"
 
     ## load the demo examples
     if args.idea_name == "all":
@@ -81,7 +62,7 @@ if __name__ == "__main__":
                 ideas = json.load(f)
             experiment_plan = ideas["full_experiment_plan"]
             if ideas["novelty"] == "yes":
-                prompt, response, cost = execution_generation_method(experiment_plan, demo_experiment_plan, demo_execution_code, client, args.engine, args.seed)
+                prompt, response, cost = execution_generation_method(experiment_plan, demo_experiment_plan, demo_execution_code, client, args.engine, args.seed, client_type=client_type)
                 execution_code = clean_code_output(response.strip())
                 print (execution_code)
                 print ("Total cost: ", cost)

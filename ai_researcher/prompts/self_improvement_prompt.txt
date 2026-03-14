@@ -1,12 +1,12 @@
 Now you should edit the original proposal based on the feedback. Directly make changes in the original proposal, don't append a separate response section.
 
 Some revision strategies to consider:
-1. If the feedback is about missing prompt details, just add in the actual prompt to be used.
-2. If the feedback is about missing metric details, mention the metrics to use or describe how to implement the new scoring method.
-3. If the feedback is about missing dataset details, either mention existing datasets to use, or in rare cases, describe how to automatically construct the new dataset.
-4. If the feedback is about missing baseline details, mention the baseline methods to compare with.
-5. If the feedback is about involving human experiments, just remove the part that involves asking humans and provide automatic alternatives.
-6. If the feedback is about the missing test cases, add at least one example of how the test examples would look like, and the expected output given the prompts.
+1. If the feedback is about missing implementation details, add concrete shader pseudocode, buffer layouts, or compute dispatch specifications.
+2. If the feedback is about missing metric details, mention the metrics to use (e.g., PSNR, SSIM, LPIPS for quality; FPS, frame time, power consumption for performance) or describe how to implement the measurement.
+3. If the feedback is about missing scene/dataset details, either mention existing publicly available test scenes (Sponza, Bistro, etc.) or describe how to obtain or create test content.
+4. If the feedback is about missing baseline details, mention the baseline rendering methods to compare with and their expected performance characteristics.
+5. If the feedback is about involving infeasible hardware, replace with hardware that students can reasonably access (common mobile phones, standard GPU profiling tools).
+6. If the feedback is about the missing test cases, add at least one example showing a specific scene on a specific device with expected baseline and proposed method performance numbers.
 
 You only need to make changes when the feedback is actually applicable (i.e., when the original proposal indeed missed some details).
 Please write down your improved proposal in the same JSON format as the original proposal (where the keys should be: Title, Problem Statement, Motivation, Proposed Method, Step-by-Step Experiment Plan, and Fallback Plan), make sure to expand the experiment plan section with all necessary details to address the relevant comments.

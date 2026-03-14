@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -9,11 +7,11 @@ from tqdm import tqdm
 import random 
 random.seed(2024)
 
-def overall_score(idea_proposal, openai_client, model):
-    prompt = "You are a professor in Natural Language Processing. Your task is to review a project proposal.\n\n"
+def overall_score(idea_proposal, openai_client, model, client_type=None):
+    prompt = "You are a professor in Mobile Graphics and Real-time Rendering. Your task is to review a project proposal.\n\n"
 
     prompt += "The project proposal is:\n" + idea_proposal + "\n\n"
-    prompt += "You should give an overall score for the idea on a scale of 1 - 10 as defined below (Major AI conferences in the descriptions below refer to top-tier NLP/AI conferences such as *ACL, COLM, NeurIPS, ICLR, and ICML.):\n"
+    prompt += "You should give an overall score for the idea on a scale of 1 - 10 as defined below (Major AI conferences in the descriptions below refer to top-tier graphics conferences such as SIGGRAPH, SIGGRAPH Asia, Eurographics, I3D, and HPG.):\n"
     prompt += "1 (Critically flawed, trivial, or wrong, would be a waste of students’ time to work on it)\n"
     prompt += "2 (Strong rejection for major AI conferences)\n"
     prompt += "3 (Clear rejection for major AI conferences)\n"
@@ -27,7 +25,7 @@ def overall_score(idea_proposal, openai_client, model):
     prompt += "Please directly provide a score between 1 and 10 for the project proposal (just a number, nothing else).\n"
 
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=2, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=2, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 if __name__ == "__main__":
@@ -35,22 +33,7 @@ if __name__ == "__main__":
     parser.add_argument('--engine', type=str, default='claude-3-5-sonnet-20240620', help='api engine; https://openai.com/api/')
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
+    client, client_type = create_client(args.engine)
     
     overall_scores = {}
     for filename in tqdm(os.listdir("../all_ideas/all_ideas")):
@@ -58,7 +41,7 @@ if __name__ == "__main__":
             continue
         with open(os.path.join("../all_ideas/all_ideas", filename), "r") as f:
             proposal = f.read()
-        prompt, response, cost = overall_score(proposal, client, args.engine)
+        prompt, response, cost = overall_score(proposal, client, args.engine, client_type=client_type)
         overall_scores[filename] = int(response.strip())
         print (filename, response, cost)
 

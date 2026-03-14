@@ -1,17 +1,18 @@
-You should raise critical questions and comments if there are any missing details from the project proposal, or if there are any parts that are not feasible for the student to complete the project within two months. For each criticism, quote the relevant sentence from the proposal and raise your question. Your criticisms should be a subset of the following categories: 
+You should raise critical questions and comments if there are any missing details from the project proposal, or if there are any parts that are not feasible for the student to complete the project within two months. For each criticism, quote the relevant sentence from the proposal and raise your question. Your criticisms should be a subset of the following categories:
 
-- missing dataset detail: the proposal should mention the datasets to use, or how to collect the data if needed
-- involving humans: try to avoid human experiments
-- missing metric detail: the proposal should mention the evaluation metrics 
-- missing prompt detail: give concrete examples of the prompts (vague descriptions are not enough), including for the new proposed prompting method and for all baselines
-- test cases: the proposal should show 1-2 examples of how the test examples would look like, how the prompts will be applied, and the expected outputs 
+- missing hardware detail: the proposal should specify the target mobile devices and GPUs for testing
+- missing scene/dataset detail: the proposal should mention the test scenes to use, or how to obtain them if custom scenes are needed
+- involving infeasible hardware: avoid experiments requiring custom or unreleased hardware that students cannot access
+- missing metric detail: the proposal should mention the evaluation metrics (e.g., FPS, frame time, PSNR/SSIM, power consumption, bandwidth)
+- missing implementation detail: give concrete descriptions of the rendering technique (vague descriptions are not enough), including shader pseudocode, buffer layouts, and compute dispatch sizes
+- test cases: the proposal should show 1-2 examples of how the test scenarios would look like, what the baseline and proposed method outputs are, and expected performance numbers
 
-Each criticism should quote a sentence from the original proposal, and try to be concise. Here are a few example criticisms: 
+Each criticism should quote a sentence from the original proposal, and try to be concise. Here are a few example criticisms:
 
-Missing data preparation detail: “Create a comprehensive list of idiomatic expressions” - how to create such a list? Any tools or sources that we can use?
-Involving human experiments: “Contrast the LLM's responses with a baseline of human expectations” - we should avoid human annotation to make the project more feasible, try to think of alternatives with automatic approaches, such as using LLMs to replace humans. 
-Metric is vague: “Develop a scoring system to quantify the level of bias in each response and compare the scores between the subtly biased prompts and the neutral prompts.” - how exactly should we implement such a scoring system? There should be detailed step-by-step instructions. 
-Prompt not specified: “Develop a set of prompts that describe scenarios involving individuals in both stereotypical and counter-stereotypical roles.” - you should always try to give the exact prompts to use. 
-Missing test cases: “Test the model on a set of prompts and compare the responses to human expectations” - add a subsection in the experiment plan to show how an example prompt is applied on a test example and what the expected output is.
+Missing hardware specification: "Test on mobile devices" - which specific mobile devices and GPU architectures? Different mobile GPUs (Adreno, Mali, Apple GPU) have very different performance characteristics and API support.
+Involving unavailable hardware: "Measure power consumption using a hardware power monitor" - students may not have access to specialized power measurement equipment; consider using software-based battery monitoring APIs instead.
+Metric is vague: "Evaluate rendering quality improvement" - how exactly should quality be measured? Specify metrics like PSNR and SSIM against a full-quality reference, and what constitutes acceptable quality for mobile.
+Implementation not specified: "Use a compute shader to analyze tile complexity" - you should specify the compute shader workgroup size, input buffers, and the exact complexity scoring formula.
+Missing test cases: "Test the method on various scenes" - add a subsection showing a specific scene on a specific device with expected baseline and proposed method performance numbers.
 
-Now generate a list of constructive criticisms (at least 1, at most 5) to identify any weaknesses or flaws in the current proposal. 
+Now generate a list of constructive criticisms (at least 1, at most 5) to identify any weaknesses or flaws in the current proposal.

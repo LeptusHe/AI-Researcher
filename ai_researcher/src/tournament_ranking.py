@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -13,8 +11,8 @@ random.seed(2024)
 
 
 @retry.retry(tries=3, delay=2)
-def better_idea(idea_1, idea_2, method, openai_client, model, seed, few_shot_demos=None, temperature=0.):
-    prompt = "You are a reviewer specialized in Natural Language Processing and Large Language Models. You are given two project summaries. One of them is accepted by a top AI conference (like ICLR or ACL) and the other one is rejected. Your task is to identify the one that has been accepted.\n"
+def better_idea(idea_1, idea_2, method, openai_client, model, seed, few_shot_demos=None, temperature=0., client_type=None):
+    prompt = "You are a reviewer specialized in Mobile Graphics, Real-time Rendering, and Game Engine Optimization. You are given two project summaries. One of them is accepted by a top graphics conference (like SIGGRAPH or Eurographics) and the other one is rejected. Your task is to identify the one that has been accepted.\n"
     
     ## zero-shot methods
     if "zero_shot" in method:
@@ -43,11 +41,11 @@ def better_idea(idea_1, idea_2, method, openai_client, model, seed, few_shot_dem
 
     # print (prompt)
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=temperature, max_tokens=3000, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=temperature, max_tokens=3000, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 
-def tournament_ranking(idea_lst, filename_lst, openai_client, model, seed, cache_name, ranking_score_dir, max_round=5, format="json"):
+def tournament_ranking(idea_lst, filename_lst, openai_client, model, seed, cache_name, ranking_score_dir, max_round=5, format="json", client_type=None):
     # Initialize scores for each idea using the first 200 characters as keys
     # initial score is 1
     scores = defaultdict(lambda: 1)
@@ -73,7 +71,7 @@ def tournament_ranking(idea_lst, filename_lst, openai_client, model, seed, cache
                 scores[format_plan_json(sorted_ideas[i])[:200]] += 1
 
         for idea1, idea2 in tqdm(match_pairs):
-            prompt, result, cost = better_idea(idea1, idea2, "zero_shot", openai_client, model, seed)
+            prompt, result, cost = better_idea(idea1, idea2, "zero_shot", openai_client, model, seed, client_type=client_type)
             if result.strip() == '1':
                 scores[format_plan_json(idea1)[:200]] += 1
                 # if idea1["score"] >= idea2["score"]:
@@ -145,23 +143,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
+    client, client_type = create_client(args.engine)
     random.seed(args.seed)
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
 
 
     if args.rank_seed_ideas:
@@ -199,6 +182,6 @@ if __name__ == "__main__":
                 filename_lst.append(filename)
 
     print ("total #ideas: ", len(idea_lst))
-    final_scores, all_costs = tournament_ranking(idea_lst, filename_lst, client, args.engine, args.seed, args.cache_name, args.ranking_score_dir, args.max_round, format=args.format)
+    final_scores, all_costs = tournament_ranking(idea_lst, filename_lst, client, args.engine, args.seed, args.cache_name, args.ranking_score_dir, args.max_round, format=args.format, client_type=client_type)
     print ("all costs: ", all_costs)
 

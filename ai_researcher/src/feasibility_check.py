@@ -1,5 +1,4 @@
-from openai import OpenAI
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -11,14 +10,14 @@ import retry
 random.seed(2024)
 
 @retry.retry(tries=3, delay=2)
-def feasibility_check(experiment_plan, criteria, openai_client, model, seed):
-    prompt = "You are a professor specialized in Natural Language Processing. A student has submitted a research project proposal to you and your job is to decide whether this project is feasible.\n"
+def feasibility_check(experiment_plan, criteria, openai_client, model, seed, client_type=None):
+    prompt = "You are a professor specialized in Mobile Graphics and Real-time Rendering. A student has submitted a research project proposal to you and your job is to decide whether this project is feasible.\n"
     prompt += "The project proposal is:\n" + experiment_plan.strip() + "\n\n"
     prompt += "Here is a list of criteria that would make a project infeasible:\n" + criteria.strip() + "\n\n"
     prompt += "If the project violates any of the above criteria, it's counted as infeasible, and you should respond with a short explanation of which criteria it violates and why. If the project is feasible, you should respond with a short explanation of why it is feasible. Give the short explanation, then change to a new line, respond with the final judgment by saying either \"yes\" or \"no\"."
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=2000, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=2000, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 
@@ -31,16 +30,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("keys.json", "r") as f:
-        keys = json.load(f)
-
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    S2_KEY = keys["s2_key"]
-    openai_client = OpenAI(
-        organization=ORG_ID,
-        api_key=OAI_KEY
-    )
+    openai_client, client_type = create_client(args.engine, keys_path="keys.json")
 
     with open("feasibility_check.txt", "r") as f:
         criteria = f.read().strip()
@@ -67,7 +57,7 @@ if __name__ == "__main__":
             print ("skipping this idea because it's not novel")
             continue 
 
-        prompt, response, cost = feasibility_check(idea, criteria, openai_client, args.engine, args.seed)
+        prompt, response, cost = feasibility_check(idea, criteria, openai_client, args.engine, args.seed, client_type=client_type)
         print (prompt + "\n")
         print (response + "\n")
         print (cost)    

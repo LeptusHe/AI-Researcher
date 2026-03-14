@@ -1,5 +1,4 @@
-from openai import OpenAI
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -9,20 +8,20 @@ from tqdm import tqdm
 import random 
 random.seed(2024)
 
-def critique(self_critique_prompt, idea_proposal, topic_description, openai_client, model):
-    prompt = "You are a professor with expertise in Natural Language Processing. You need to provide some constructive feedback to the given project proposal on the topic of: " + topic_description + ".\n\n"
+def critique(self_critique_prompt, idea_proposal, topic_description, openai_client, model, client_type=None):
+    prompt = "You are a professor with expertise in Mobile Graphics and Real-time Rendering. You need to provide some constructive feedback to the given project proposal on the topic of: " + topic_description + ".\n\n"
 
     prompt += "The project proposal is:\n" + format_plan_json(idea_proposal) + "\n\n"
     prompt += self_critique_prompt
 
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, json_output=False, client_type=client_type)
     return prompt, response, cost
 
-def more_lit_review(grounding_papers, idea_proposal, critic, topic_description, openai_client, model):
+def more_lit_review(grounding_papers, idea_proposal, critic, topic_description, openai_client, model, client_type=None):
     grounding_papers_str = format_papers_for_printing(grounding_papers)
 
-    prompt = "You are a researcher with expertise in Natural Language Processing. You have received a project proposal on the topic of: " + topic_description + ".\n"
+    prompt = "You are a researcher with expertise in Mobile Graphics and Real-time Rendering. You have received a project proposal on the topic of: " + topic_description + ".\n"
     prompt += "The proposal is:\n" + idea_proposal + "\n\n"
     prompt += "The proposal has received some feedback from reviewers:\n" + critic + "\n"
     prompt += "You should do a round of literature review to find relevant papers that can help address these feedback."
@@ -36,7 +35,7 @@ def more_lit_review(grounding_papers, idea_proposal, critic, topic_description, 
     prompt += "Now directly give me your new queries (following the function definitions above). You are allowed to generate at most 3 different queries (focus on the most important ones), put each one in a new line without any other texts. If you feel that you have already collected enough papers, you can just give me an empty line to skip this step."
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=500, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=500, json_output=False, client_type=client_type)
 
     all_papers = []
     query_lst = response.strip().split("\n")
@@ -47,7 +46,7 @@ def more_lit_review(grounding_papers, idea_proposal, critic, topic_description, 
 
     return prompt, response, cost, all_papers
 
-def paper_scoring(paper_lst, topic_description, critic, openai_client, model):
+def paper_scoring(paper_lst, topic_description, critic, openai_client, model, client_type=None):
     ## use gpt4 to score each paper 
     prompt = "You are a helpful literature review assistant whose job is to read the below set of papers and score each paper. The criteria for scoring are:\n"
     prompt += "(1) The paper is relevant to the topic of: " + topic_description.strip() + ".\n"
@@ -57,19 +56,19 @@ def paper_scoring(paper_lst, topic_description, critic, openai_client, model):
     # print (prompt)
 
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=1000, json_output=True)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=1000, json_output=True, client_type=client_type)
     return prompt, response, cost
 
-def improve_idea(self_improvement_prompt, criticisms, idea_proposal, topic_description, openai_client, model):
+def improve_idea(self_improvement_prompt, criticisms, idea_proposal, topic_description, openai_client, model, client_type=None):
   
-    prompt = "You are a researcher with expertise in Natural Language Processing. You have written a project proposal on the topic of: " + topic_description + ".\n"
+    prompt = "You are a researcher with expertise in Mobile Graphics and Real-time Rendering. You have written a project proposal on the topic of: " + topic_description + ".\n"
     prompt += "The original proposal is:\n" + format_plan_json(idea_proposal) + "\n\n"
     prompt += "The proposal has received some feedback and criticisms from reviewers:\n" + criticisms + "\n"
     prompt += self_improvement_prompt
     # print (prompt)
 
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, json_output=True)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, json_output=True, client_type=client_type)
     return prompt, response, cost
 
 
@@ -81,16 +80,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
-
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    S2_KEY = keys["s2_key"]
-    openai_client = OpenAI(
-        organization=ORG_ID,
-        api_key=OAI_KEY
-    )
+    openai_client, client_type = create_client(args.engine)
     
     with open("prompts/self_critique_prompt.txt", "r") as f:
         self_critique_prompt = f.read()
@@ -113,10 +103,10 @@ if __name__ == "__main__":
         topic_description = ideas["topic_description"]
         experiment_plan = ideas["improved_experiment_plan"]
 
-        prompt, criticisms, cost = critique(self_critique_prompt, experiment_plan, topic_description, openai_client, args.engine)
+        prompt, criticisms, cost = critique(self_critique_prompt, experiment_plan, topic_description, openai_client, args.engine, client_type=client_type)
         print ("criticisms: \n", criticisms)
 
-        prompt, new_plan, cost = improve_idea(self_improvement_prompt, criticisms, experiment_plan, topic_description, openai_client, args.engine)
+        prompt, new_plan, cost = improve_idea(self_improvement_prompt, criticisms, experiment_plan, topic_description, openai_client, args.engine, client_type=client_type)
         print ("\nnew plan: \n", new_plan)
 
         ## cache the improved idea

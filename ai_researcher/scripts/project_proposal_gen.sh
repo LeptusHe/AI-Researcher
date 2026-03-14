@@ -1,7 +1,7 @@
 ## example usage
 idea_cache_dir="../cache_results_test/ideas_dedup/"
 project_proposal_cache_dir="../cache_results_test/project_proposals/"
-cache_names=("factuality_prompting_method")
+cache_names=("mobile_rendering_optimization")
 seed=2024
 
 for cache_name in "${cache_names[@]}"; do
@@ -13,5 +13,5 @@ for cache_name in "${cache_names[@]}"; do
     --experiment_plan_cache_dir "$project_proposal_cache_dir" \
     --idea_name "all" \
     --seed $seed \
-    --method "prompting" 
+    --method "rendering_optimization"
 done

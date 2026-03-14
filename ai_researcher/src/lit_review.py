@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api, format_plan_json
+from utils import call_api, create_client, format_plan_json
 import argparse
 import json
 from lit_review_tools import parse_and_execute, format_papers_for_printing, print_top_papers_from_paper_bank, dedup_paper_bank
@@ -8,7 +6,7 @@ from utils import cache_output
 import os
 import retry
 
-def initial_search(topic_description, openai_client, model, seed, mode="topic", idea=None):
+def initial_search(topic_description, openai_client, model, seed, mode="topic", idea=None, client_type=None):
     if mode == "topic":
         ## use the topic description as the query
         # prompt = "You are a researcher doing literature review on the topic of " + topic_description.strip() + ".\n"
@@ -23,11 +21,11 @@ def initial_search(topic_description, openai_client, model, seed, mode="topic", 
     prompt += "Formulate your query as: KeywordQuery(\"query\"). Just give me one query, and the query can be a concatenation of multiple keywords (just put a space between every word); but please be concise and try to cover the most important aspects.\n"
     prompt += "Your query (just return the query itself with no additional text):"
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=100, seed=seed, json_output=False)
-    
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=100, seed=seed, json_output=False, client_type=client_type)
+
     return prompt, response, cost
 
-def next_query(topic_description, openai_client, model, seed, grounding_papers, past_queries, mode="topic", idea=None):
+def next_query(topic_description, openai_client, model, seed, grounding_papers, past_queries, mode="topic", idea=None, client_type=None):
     grounding_papers_str = format_papers_for_printing(grounding_papers)
     if mode == "topic":
         prompt = "You are a researcher. You are doing literature review on the topic of " + topic_description.strip() + ".\n" + "You should propose some queries for using the Semantic Scholar API to find the most relevant papers to this topic. "
@@ -45,11 +43,11 @@ def next_query(topic_description, openai_client, model, seed, grounding_papers, 
     prompt += "Please formulate a new query to expand our paper collection with more diverse and relevant papers (you can do so by diversifying the types of queries and minimizing the overlap with previous queries; e.g., try to include all three types of queries if possible). Directly give me your new query without any explanation or additional text, just the query itself:"
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=100, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=100, seed=seed, json_output=False, client_type=client_type)
 
     return prompt, response, cost
 
-def paper_score(paper_lst, topic_description, openai_client, model, seed, mode="topic", idea=None):
+def paper_score(paper_lst, topic_description, openai_client, model, seed, mode="topic", idea=None, client_type=None):
     ## use gpt4 to score each paper, focusing on method papers
     prompt = "You are a helpful literature review assistant whose job is to read the below set of papers and score each paper. The criteria for scoring are:\n"
     
@@ -58,10 +56,10 @@ def paper_score(paper_lst, topic_description, openai_client, model, seed, mode="
     elif mode == "idea":
         prompt += "(1) The paper is directly relevant to the proposed idea: " + format_plan_json(idea) + "\nNote that it should be specific to solve a similar problem or use a similar approach, rather than just generic methods. "
 
-    if "prompting" in topic_description:
-        prompt += "The proposed method should be about new prompting methods, rather than other techniques like finetuning or pretraining.\n"
-    elif "finetuning" in topic_description:
-        prompt += "The proposed method should be about new finetuning methods, rather than other techniques like prompting.\n"
+    if "rendering_optimization" in topic_description or "rendering" in topic_description or "shader" in topic_description or "LOD" in topic_description:
+        prompt += "The proposed method should be about rendering optimization techniques for mobile GPUs, rather than general neural network training or desktop-only methods.\n"
+    elif "neural" in topic_description or "neural_graphics" in topic_description:
+        prompt += "The proposed method should be about neural graphics methods optimized for mobile deployment, rather than desktop-only neural rendering.\n"
     else:
         prompt += "\n"
 
@@ -71,18 +69,18 @@ def paper_score(paper_lst, topic_description, openai_client, model, seed, mode="
     prompt += "Please score each paper from 1 to 10. Write the response in JSON format with \"paperID: score\" as the key and value for each paper.\n"
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, seed=seed, json_output=True)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4000, seed=seed, json_output=True, client_type=client_type)
     return prompt, response, cost
 
 
 @retry.retry(tries=3, delay=2)
-def collect_papers(topic_description, openai_client, model, seed, grounding_k = 10, max_papers=60, print_all=True, mode = "topic", idea=None):
+def collect_papers(topic_description, openai_client, model, seed, grounding_k = 10, max_papers=60, print_all=True, mode = "topic", idea=None, client_type=None):
     paper_bank = {}
     total_cost = 0
     all_queries = []
 
     ## get initial set of seed papers by KeywordSearch 
-    _, query, cost = initial_search(topic_description, openai_client, model, seed, mode=mode, idea=idea)
+    _, query, cost = initial_search(topic_description, openai_client, model, seed, mode=mode, idea=idea, client_type=client_type)
     total_cost += cost
     all_queries.append(query)
     paper_lst = parse_and_execute(query)
@@ -94,7 +92,7 @@ def collect_papers(topic_description, openai_client, model, seed, grounding_k = 
         paper_bank = {paper["paperId"]: paper for paper in paper_lst}
 
         ## score each paper
-        _, response, cost = paper_score(paper_lst, topic_description, openai_client, model, seed, mode=mode, idea=idea)
+        _, response, cost = paper_score(paper_lst, topic_description, openai_client, model, seed, mode=mode, idea=idea, client_type=client_type)
         total_cost += cost
         response = json.loads(response.strip())
 
@@ -105,27 +103,27 @@ def collect_papers(topic_description, openai_client, model, seed, grounding_k = 
             try:
                 paper_bank[k]["score"] = v
             except:
-                continue 
+                continue
     else:
         paper_lst = []
 
-    ## print stats 
+    ## print stats
     if print_all:
         print ("initial query: ", query)
         print ("current total cost: ", total_cost)
         print ("current size of paper bank: ", len(paper_bank))
         print_top_papers_from_paper_bank(paper_bank, top_k=10)
         print ("\n")
-    
+
     iter = 0
     ## keep expanding the paper bank until limit is reached
     while len(paper_bank) < max_papers and iter < 10:
         ## select the top k papers with highest scores for grounding
         data_list = [{'id': id, **info} for id, info in paper_bank.items()]
         grounding_papers = sorted(data_list, key=lambda x: x['score'], reverse=True)[ : grounding_k]
-        
+
         ## generate the next query
-        _, new_query, cost = next_query(topic_description, openai_client, model, seed, grounding_papers, all_queries, mode=mode, idea=idea)
+        _, new_query, cost = next_query(topic_description, openai_client, model, seed, grounding_papers, all_queries, mode=mode, idea=idea, client_type=client_type)
         all_queries.append(new_query)
         total_cost += cost 
         if print_all:
@@ -146,7 +144,7 @@ def collect_papers(topic_description, openai_client, model, seed, grounding_k = 
             paper_bank.update({paper["paperId"]: paper for paper in paper_lst})
             
             ## gpt4 score new papers
-            _, response, cost = paper_score(paper_lst, topic_description, openai_client, model, seed, mode=mode, idea=idea)
+            _, response, cost = paper_score(paper_lst, topic_description, openai_client, model, seed, mode=mode, idea=idea, client_type=client_type)
             total_cost += cost
             response = json.loads(response.strip())
             for k,v in response.items():
@@ -189,23 +187,9 @@ if __name__ == "__main__":
     parser.add_argument('--print_all', action='store_true', help='whether to print out the intermediate process')
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
+    client, client_type = create_client(args.engine)
 
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    S2_KEY = keys["s2_key"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
+    S2_KEY = json.load(open("../keys.json", "r")).get("s2_key", "")
 
     idea = {}
     if args.mode == "idea":
@@ -216,7 +200,7 @@ if __name__ == "__main__":
     elif args.mode == "topic":
         topic_description = args.topic_description
 
-    paper_bank, total_cost, all_queries = collect_papers(topic_description, client, args.engine, args.seed, args.grounding_k, max_papers=args.max_paper_bank_size, print_all=args.print_all, mode=args.mode, idea=idea)
+    paper_bank, total_cost, all_queries = collect_papers(topic_description, client, args.engine, args.seed, args.grounding_k, max_papers=args.max_paper_bank_size, print_all=args.print_all, mode=args.mode, idea=idea, client_type=client_type)
     output = format_papers_for_printing(paper_bank[ : 10])
     print ("Top 10 papers: ")
     print (output)

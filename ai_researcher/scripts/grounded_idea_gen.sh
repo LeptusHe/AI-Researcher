@@ -1,14 +1,14 @@
 ## example usage
-topic_names=("factuality_prompting_method")
+topic_names=("mobile_rendering_optimization")
 ideas_n=5 ## batch size
-methods=("prompting")
+methods=("rendering_optimization")
 rag_values=("True" "False")
 
-# Iterate over each seed 
+# Iterate over each seed
 for seed in {1..2}; do
-    # Iterate over each topic name 
+    # Iterate over each topic name
     for topic in "${topic_names[@]}"; do
-        # Iterate over each method 
+        # Iterate over each method
         for method in "${methods[@]}"; do
             # Iterate over RAG values True and False
             for rag in "${rag_values[@]}"; do
@@ -21,7 +21,7 @@ for seed in {1..2}; do
                  --method "$method" \
                  --ideas_n $ideas_n \
                  --seed $seed \
-                 --RAG $rag 
+                 --RAG $rag
             done
         done
     done

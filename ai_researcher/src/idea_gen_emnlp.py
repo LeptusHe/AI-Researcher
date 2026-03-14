@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api, shuffle_dict_and_convert_to_string
+from utils import call_api, create_client, shuffle_dict_and_convert_to_string
 import argparse
 import json
 import os
@@ -10,12 +8,12 @@ import random
 import retry
 
 @retry.retry(tries=3, delay=2)
-def idea_generation(existing_ideas, examples, ideas_n, topic_description, openai_client, model, seed):
-    prompt = "You are an expert researcher in Natural Language Processing. Now I want you to help me brainstorm some new research project ideas on the topic of: " + topic_description + ".\n\n"
+def idea_generation(existing_ideas, examples, ideas_n, topic_description, openai_client, model, seed, client_type=None):
+    prompt = "You are an expert researcher in Mobile Graphics and Real-time Rendering. Now I want you to help me brainstorm some new research project ideas on the topic of: " + topic_description + ".\n\n"
     prompt += "You should generate {} different ideas on this topic. Try to be creative and diverse in the idea generation, and do not repeat any similar ideas. ".format(str(ideas_n))
-    prompt += "We are targeting the EMNLP 2024 conference (The 2024 Conference on Empirical Methods in Natural Language Processing), and you should aim for timely and impactful new ideas that can potentially win best paper awards at EMNLP.\n"
-    prompt += "EMNLP 2024 invites the submission of papers featuring substantial, original, and unpublished research on empirical methods for Natural Language Processing. The type of contribution can include: formulate new problems, propose new methods that outperform existing baselines, construct new datasets or benchmarks, propose new evaluation metrics, propose novel applications of NLP, conduct empirical analysis, or any other novel contribution that advances the field of NLP. Note that we do not take survey or position papers - there has to be some computational experiments involved.\n"
-    prompt += "Each idea should be described as: (1) Problem: State the problem statement, which should be closely related to the given topic and within the scope of NLP research. (2) Existing Work: Mention the most relevant existing work. (3) Motivation: Explain the inspiration of the proposed study and why it would work well or be important to study. (4) Proposed Study: Propose your new method or analysis or benchmark and describe it in detail. The proposal should be maximally different from all existing work and baselines, and be more advanced and effective than the baselines. You should be as creative as possible, we love unhinged ideas that sound crazy. This should be the most detailed section of the proposal. (5) Experiment Plan: Specify the hypotheses, experiment steps, baselines, evaluation metrics, and/or any other relevant details.\n"
+    prompt += "We are targeting the SIGGRAPH 2024 conference (ACM SIGGRAPH 2024), and you should aim for timely and impactful new ideas that can potentially win best paper awards at SIGGRAPH.\n"
+    prompt += "SIGGRAPH 2024 invites the submission of papers featuring substantial, original, and unpublished research on mobile graphics and real-time rendering. The type of contribution can include: formulate new problems, propose new methods that outperform existing baselines, construct new datasets or benchmarks, propose new evaluation metrics, propose novel applications of mobile graphics, conduct empirical analysis, or any other novel contribution that advances the field of mobile graphics and real-time rendering. Note that we do not take survey or position papers - there has to be some computational experiments involved.\n"
+    prompt += "Each idea should be described as: (1) Problem: State the problem statement, which should be closely related to the given topic and within the scope of mobile graphics research. (2) Existing Work: Mention the most relevant existing work. (3) Motivation: Explain the inspiration of the proposed study and why it would work well or be important to study. (4) Proposed Study: Propose your new method or analysis or benchmark and describe it in detail. The proposal should be maximally different from all existing work and baselines, and be more advanced and effective than the baselines. You should be as creative as possible, we love unhinged ideas that sound crazy. This should be the most detailed section of the proposal. (5) Experiment Plan: Specify the hypotheses, experiment steps, baselines, evaluation metrics, and/or any other relevant details.\n"
     prompt += "You can follow these examples to get a sense of how the ideas should be formatted (but don't borrow the ideas themselves):\n" + examples + "\n"
     prompt += "You should make sure to come up with your own novel and different ideas for the specified problem: " + topic_description + "\n"
     if "claude" in model:
@@ -27,7 +25,7 @@ def idea_generation(existing_ideas, examples, ideas_n, topic_description, openai
     print (prompt)
 
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0.9, max_tokens=4096, seed=seed, json_output=True)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0.9, max_tokens=4096, seed=seed, json_output=True, client_type=client_type)
     return prompt, response, cost
 
 if __name__ == "__main__":
@@ -39,23 +37,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
+    client, client_type = create_client(args.engine)
     random.seed(args.seed)
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
     
     topic_description = args.topic_description
     ideas_file = args.idea_cache
@@ -81,7 +64,7 @@ if __name__ == "__main__":
         print ("\n")
         print ("generating {} ideas...".format(str(args.ideas_n)))
         
-        prompt, response, cost = idea_generation(existing_ideas, method_idea_examples, args.ideas_n, topic_description, client, args.engine, args.seed)
+        prompt, response, cost = idea_generation(existing_ideas, method_idea_examples, args.ideas_n, topic_description, client, args.engine, args.seed, client_type=client_type)
         
         print ("idea generation cost: ", cost)
 

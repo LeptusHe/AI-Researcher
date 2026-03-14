@@ -1,6 +1,4 @@
-from openai import OpenAI
-import anthropic
-from utils import call_api
+from utils import call_api, create_client
 import argparse
 import json
 import os
@@ -9,13 +7,13 @@ import random
 import retry
 
 @retry.retry(tries=3, delay=2)
-def summarize_reviews(reviews, openai_client, model, seed):
+def summarize_reviews(reviews, openai_client, model, seed, client_type=None):
     prompt = "Help me do some qualitative analysis. I have collected expert reviews on a set of AI ideas (including AI and AI_Rerank) and a set of human ideas. I want you to summarize the main differences between AI ideas and human ideas, focusing their unique strengths and weaknesses. For the output format, I want you to first list the main conclusions, and then for each conclusion, make sure to quote some examples as evidence. The conclusions should be things like \"Human ideas are generally more grounded in existing research and practical considerations, but may be less innovative.\" or \"AI ideas sometimes make unrealistic assumptions about model capabilities.\", rather than just comparing the scores.\n\n"
     prompt += "Here are the reviews:\n\n"
     prompt += reviews + "\n\n"
     
     prompt_messages = [{"role": "user", "content": prompt}]
-    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4096, seed=seed, json_output=False)
+    response, cost = call_api(openai_client, model, prompt_messages, temperature=0., max_tokens=4096, seed=seed, json_output=False, client_type=client_type)
     return prompt, response, cost
 
 
@@ -25,23 +23,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=2024, help="seed for GPT-4 generation")
     args = parser.parse_args()
 
-    with open("../keys.json", "r") as f:
-        keys = json.load(f)
+    client, client_type = create_client(args.engine)
     random.seed(args.seed)
-
-    ANTH_KEY = keys["anthropic_key"]
-    OAI_KEY = keys["api_key"]
-    ORG_ID = keys["organization_id"]
-    
-    if "claude" in args.engine:
-        client = anthropic.Anthropic(
-            api_key=ANTH_KEY,
-        )
-    else:
-        client = OpenAI(
-            organization=ORG_ID,
-            api_key=OAI_KEY
-        )
     
     with open("../results/data_points_dedup.json", "r") as f:
         data = json.load(f)
@@ -72,7 +55,7 @@ Overall Rationale: {data['overall_rationale'][i]}
             # Concatenate reviews into a single string
             reviews_concatenated = "\n".join(review_batch)
             # Summarize the batch
-            prompt, response, cost = summarize_reviews(reviews_concatenated, client, args.engine, args.seed)
+            prompt, response, cost = summarize_reviews(reviews_concatenated, client, args.engine, args.seed, client_type=client_type)
             print(response)
             print ("-------------------------------------\n")
             
@@ -83,6 +66,6 @@ Overall Rationale: {data['overall_rationale'][i]}
     # Handle any remaining reviews that didn't complete a full batch 
     if review_batch:
         reviews_concatenated = "\n".join(review_batch)
-        prompt, response, cost = summarize_reviews(reviews_concatenated, client, args.engine, args.seed)
+        prompt, response, cost = summarize_reviews(reviews_concatenated, client, args.engine, args.seed, client_type=client_type)
         print(response)
         print ("-------------------------------------\n")

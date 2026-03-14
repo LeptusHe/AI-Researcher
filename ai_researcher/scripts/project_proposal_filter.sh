@@ -1,7 +1,7 @@
 ## example usage
 cache_dir="../cache_results_test/project_proposals/"
 passed_cache_dir="../cache_results_test/project_proposals_passed/"
-cache_names=("factuality_prompting_method")
+cache_names=("mobile_rendering_optimization")
 seed=2024
 
 # Iterate over each cache name and run the Python script
@@ -12,5 +12,5 @@ for cache_name in "${cache_names[@]}"; do
     --cache_dir "$cache_dir" \
     --cache_name "$cache_name" \
     --passed_cache_dir "$passed_cache_dir" \
-    --score_file "../cache_results_test/ranking/$cache_name/round_5.json" 
+    --score_file "../cache_results_test/ranking/$cache_name/round_5.json"
 done
